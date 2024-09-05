@@ -1,17 +1,21 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import whisper
-import sounddevice as sd
-from scipy.io.wavfile import write
-import pyttsx3
-import sys
 from PyQt5 import QtWidgets, QtGui
+from scipy.io.wavfile import write
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+import pyttsx3
+import sounddevice as sd
+import sys
 import threading
 import time
+import whisper
 
 model_name = "gpt2"  # or another model of your choice
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
+# local_model_path = "./local_model/Meta-Llama3.1-8B-Instruct"
+# tokenizer = AutoTokenizer.from_pretrained(local_model_path)
+# model = AutoModelForCausalLM.from_pretrained(local_model_path)
 
 def process_request(text):
     # Ensure the tokenizer has a padding token
@@ -35,9 +39,9 @@ def process_request(text):
     output = model.generate(
         input_ids,
         attention_mask=attention_mask,
-        max_length=150,  # Increased to accommodate more detailed responses
-        min_length=30,   # Set a reasonable minimum length
-        do_sample=True,  # Enable sampling
+        max_length=150,
+        min_length=30,
+        do_sample=True,
         no_repeat_ngram_size=2,
         temperature=0.7,
         top_k=50,
@@ -47,7 +51,7 @@ def process_request(text):
     )
 
     # Decode the output to a string, skipping special tokens
-    response = tokenizer.decode(output[0], skip_special_tokens=True)
+    response = tokenizer.decode(output[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
     if response.startswith(prompt):
         response = response[len(prompt):].strip()
 
@@ -55,7 +59,6 @@ def process_request(text):
     print(response)
 
     return response
-
 
 
 def listen():
@@ -79,23 +82,17 @@ def process():
     return result["text"]
 
 def say(text):
-
     # Initialize the TTS engine
     engine = pyttsx3.init()
     voices = engine.getProperty('voices')
 
-    # Set a more natural-sounding voice, based on the listed voices
     engine.setProperty('voice', voices[25].id)  # Example: change the index as needed
-
-    # Set properties (optional)
     engine.setProperty('rate', 150)  # Speed of speech
     engine.setProperty('volume', 1)  # Volume (0.0 to 1.0)
-
-    # Speak the text
     engine.say(text)
 
-    # Wait for the speech to finish
     engine.runAndWait()
+
 
 class SystemTrayApp(QtWidgets.QSystemTrayIcon):
     def __init__(self, icon, icon_running, parent=None):
@@ -155,7 +152,8 @@ class SystemTrayApp(QtWidgets.QSystemTrayIcon):
     def on_exit(self):
         QtWidgets.qApp.quit()
 
-def create_tray_icon():
+
+def main():
     app = QtWidgets.QApplication(sys.argv)
 
     icon_idle = QtGui.QIcon(QtGui.QPixmap("idle_icon.png"))  # Load idle icon
@@ -169,12 +167,13 @@ def create_tray_icon():
     # Run the application event loop
     sys.exit(app.exec_())
 
+
 if __name__ == "__main__":
     try:
-        # Run the system tray icon in a separate thread
-        threading.Thread(target=create_tray_icon).start()
+        # Start the application in the main thread
+        main()
 
-        # Keep the main thread alive
+        # Keep the main thread alive if necessary
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
