@@ -1,4 +1,3 @@
-import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import whisper
 import sounddevice as sd
@@ -9,7 +8,7 @@ from PyQt5 import QtWidgets, QtGui
 import threading
 import time
 
-model_name = "EleutherAI/pythia-14m"  # or another model of your choice
+model_name = "gpt2"  # or another model of your choice
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
@@ -24,17 +23,40 @@ def process_request(text):
     if model.config.pad_token_id is None:
         model.config.pad_token_id = tokenizer.pad_token_id
 
+    # Prepare a contextual prompt
+    prompt = f"You are a desktop assistant, please provide a detailed answer to the following question: {text}"
+
     # Tokenize the input and return both input_ids and attention_mask
-    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=100)
+    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, max_length=100)
     input_ids = inputs.input_ids
     attention_mask = inputs.attention_mask
 
     # Generate the output with input_ids and attention_mask
-    output = model.generate(input_ids, attention_mask=attention_mask, max_length=100)
+    output = model.generate(
+        input_ids,
+        attention_mask=attention_mask,
+        max_length=150,  # Increased to accommodate more detailed responses
+        min_length=30,   # Set a reasonable minimum length
+        do_sample=True,  # Enable sampling
+        no_repeat_ngram_size=2,
+        temperature=0.7,
+        top_k=50,
+        top_p=0.9,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id
+    )
 
     # Decode the output to a string, skipping special tokens
     response = tokenizer.decode(output[0], skip_special_tokens=True)
+    if response.startswith(prompt):
+        response = response[len(prompt):].strip()
+
+    print(prompt)
+    print(response)
+
     return response
+
+
 
 def listen():
     sample_rate = 44100  # Sample rate in Hz
